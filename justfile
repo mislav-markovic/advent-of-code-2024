@@ -12,9 +12,17 @@ _build configuration:
 # Build release version of project
 build: (_build "release")
 
+# Format source code
+fmt:
+  cargo fmt --all
+
+# Run linter against source code
+check:
+  cargo clippy
+
 # Runs solution for specific provided day, of no input given defaults to running last days solution
 exec day=latest_day: build
-  cargo run --release --bin {{day}}
+  RUST_LOG=info cargo run --release --bin {{day}}
 
 # Prepares new day solution. `day_num` param should be given without leading zeroes
 prepare day_num:
