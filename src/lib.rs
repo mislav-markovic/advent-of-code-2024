@@ -23,10 +23,10 @@ pub fn init() {
 }
 
 pub fn load_day_input(day_name: impl AsRef<str>) -> eyre::Result<String> {
-    const INPUTS_DIR: &'static str = "../inputs/";
+    const INPUTS_DIR_NAME: &'static str = "inputs";
     let day_name = day_name.as_ref();
 
-    let input_path: PathBuf = [INPUTS_DIR, day_name].iter().collect();
+    let input_path: PathBuf = [INPUTS_DIR_NAME, day_name].iter().collect();
     let input_path = input_path
         .canonicalize()
         .wrap_err_with(|| format!("failed to expand input file path: {:?}", input_path))?;
