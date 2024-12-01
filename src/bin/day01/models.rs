@@ -1,8 +1,10 @@
 use std::{cmp::Reverse, collections::BinaryHeap, str::FromStr};
 
+use rustc_hash::FxHashMap;
+
 use crate::error::Day01Error;
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) struct LocationId {
     id: u64,
 }
@@ -82,6 +84,23 @@ impl SideBySide {
             .into_iter()
             .zip(self.rhs.into_iter())
             .map(|(lhs, rhs)| lhs.distance(&rhs))
+            .sum()
+    }
+
+    pub(crate) fn similarity_score(self) -> u64 {
+        let histogram = {
+            let mut map = FxHashMap::<LocationId, u64>::default();
+            for id in self.rhs.into_iter() {
+                map.entry(id)
+                    .and_modify(|counter| *counter += 1)
+                    .or_insert(1);
+            }
+            map
+        };
+
+        self.lhs
+            .into_iter()
+            .map(|lhs| lhs.id * histogram.get(&lhs).unwrap_or(&0))
             .sum()
     }
 }

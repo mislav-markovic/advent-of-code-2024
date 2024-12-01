@@ -23,7 +23,7 @@ pub fn init() {
 }
 
 pub fn load_day_input(day_name: impl AsRef<str>) -> eyre::Result<String> {
-    const INPUTS_DIR_NAME: &'static str = "inputs";
+    const INPUTS_DIR_NAME: &str = "inputs";
     let day_name = day_name.as_ref();
 
     let input_path: PathBuf = [INPUTS_DIR_NAME, day_name].iter().collect();

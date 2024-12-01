@@ -14,8 +14,11 @@ fn main() -> eyre::Result<()> {
 
     info!("solving part 1...");
     let part_1_res = part1(&data)?;
-
     info!("Part 1 solution: {part_1_res}");
+
+    info!("solving part 2...");
+    let part_2_res = part2(&data)?;
+    info!("Part 2 solution: {part_2_res}");
 
     Ok(())
 }
@@ -30,4 +33,12 @@ fn part1(input: &str) -> eyre::Result<u64> {
     Ok(total_distance)
 }
 
-fn part2() {}
+fn part2(input: &str) -> eyre::Result<u64> {
+    let side_by_side = input
+        .parse::<SideBySide>()
+        .wrap_err("failed to parse side by side lists from input")?;
+
+    let similarity_score = side_by_side.similarity_score();
+
+    Ok(similarity_score)
+}
