@@ -26,6 +26,7 @@ dependencies = [
  "derive_more",
  "eyre",
  "itertools",
+ "regex",
  "rustc-hash",
  "thiserror",
  "tracing",
