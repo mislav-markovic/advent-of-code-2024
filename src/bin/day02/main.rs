@@ -29,11 +29,18 @@ fn part1(data: &str) -> eyre::Result<usize> {
         .wrap_err("failed to parse data")?;
     let maker = || SafetyRules::new(vec![make_sorted_rule(), make_diff_rule()]);
 
-    let safe_count = data.count_safe_with_rules(maker);
+    let safe_count = data.count_safe_with_rules(maker, false);
 
     Ok(safe_count)
 }
 
 fn part2(data: &str) -> eyre::Result<usize> {
-    Ok(0)
+    let data = data
+        .parse::<UnusualData>()
+        .wrap_err("failed to parse data")?;
+    let maker = || SafetyRules::new(vec![make_sorted_rule(), make_diff_rule()]);
+
+    let safe_count = data.count_safe_with_rules(maker, true);
+
+    Ok(safe_count)
 }
