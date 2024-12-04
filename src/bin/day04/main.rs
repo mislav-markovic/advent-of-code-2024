@@ -35,16 +35,21 @@ fn part1(data: &str) -> eyre::Result<usize> {
 }
 
 fn part2(data: &str) -> eyre::Result<usize> {
-    Ok(0)
+    const MAS: &[u8] = b"MAS";
+
+    let res = data
+        .parse::<Puzzle>()
+        .wrap_err("Failed to parse word puzzle")?
+        .count_x_pattern(MAS);
+
+    Ok(res)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[test]
-    fn part_1_sample_data() {
-        const SAMPLE: &str = r"MMMSXXMASM
+    const SAMPLE: &str = r"MMMSXXMASM
 MSAMXMSMSA
 AMXSXMAAMM
 MSAMASMSMX
@@ -55,8 +60,17 @@ SAXAMASAAA
 MAMMMXMMMM
 MXMXAXMASX";
 
+    #[test]
+    fn part_1_sample_data() {
         let part1_res = part1(SAMPLE).unwrap();
 
         assert_eq!(18, part1_res);
+    }
+
+    #[test]
+    fn part_2_sample_data() {
+        let part2_res = part2(SAMPLE).unwrap();
+
+        assert_eq!(9, part2_res);
     }
 }
