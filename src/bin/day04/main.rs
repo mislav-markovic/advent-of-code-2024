@@ -3,6 +3,7 @@ mod models;
 
 use advent_of_code_2024::{init, load_day_input};
 use eyre::Context;
+use models::Puzzle;
 use tracing::info;
 
 fn main() -> eyre::Result<()> {
@@ -22,10 +23,40 @@ fn main() -> eyre::Result<()> {
     Ok(())
 }
 
-fn part1(data: &str) -> eyre::Result<u64> {
-    todo!()
+fn part1(data: &str) -> eyre::Result<usize> {
+    const XMAS: &[u8] = b"XMAS";
+
+    let res = data
+        .parse::<Puzzle>()
+        .wrap_err("Failed to parse word puzzle")?
+        .count_pattern(XMAS);
+
+    Ok(res)
 }
 
-fn part2(data: &str) -> eyre::Result<u64> {
-    todo!()
+fn part2(data: &str) -> eyre::Result<usize> {
+    Ok(0)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn part_1_sample_data() {
+        const SAMPLE: &str = r"MMMSXXMASM
+MSAMXMSMSA
+AMXSXMAAMM
+MSAMASMSMX
+XMASAMXAMM
+XXAMMXXAMA
+SMSMSASXSS
+SAXAMASAAA
+MAMMMXMMMM
+MXMXAXMASX";
+
+        let part1_res = part1(SAMPLE).unwrap();
+
+        assert_eq!(18, part1_res);
+    }
 }
