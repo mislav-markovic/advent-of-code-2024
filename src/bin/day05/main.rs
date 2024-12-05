@@ -2,7 +2,7 @@ mod error;
 mod models;
 
 use advent_of_code_2024::{init, load_day_input};
-use eyre::{bail, Context};
+use eyre::Context;
 use models::{PageOrderList, PageRule, PageRuleList};
 use tracing::info;
 
@@ -37,7 +37,18 @@ fn part1(data: &str) -> eyre::Result<usize> {
 }
 
 fn part2(data: &str) -> eyre::Result<usize> {
-    Ok(0)
+    info!("Parsing data...");
+
+    let (pages, rules) = load_from_data(data)?;
+
+    let rv = pages
+        .into_iter()
+        .filter(|p| !p.is_valid(rules.as_slice()))
+        .map(|unordered| unordered.fix(rules.as_slice()))
+        .map(|fixed| fixed.middle_page())
+        .sum();
+
+    Ok(rv)
 }
 
 fn load_from_data(data: &str) -> eyre::Result<(Vec<PageOrderList>, PageRuleList)> {

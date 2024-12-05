@@ -1,6 +1,7 @@
 use std::str::FromStr;
 
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
+use tracing::warn;
 
 use crate::error::Day05Error;
 
@@ -94,6 +95,63 @@ impl PageOrderList {
         let middle = (self.pages.len() - 1) / 2;
         self.pages[middle]
     }
+
+    pub(crate) fn fix(mut self, rules: &[PageRule]) -> Self {
+        if self.is_valid(rules) {
+            warn!("was valid page, nothing to fix");
+            return self;
+        }
+
+        // after -> [before]
+        let mut deps: FxHashMap<usize, FxHashSet<usize>> = FxHashMap::default();
+        let original_set: FxHashSet<usize> = FxHashSet::from_iter(self.pages.iter().cloned());
+        for rule in rules {
+            if !original_set.contains(&rule.before) || !original_set.contains(&rule.after) {
+                continue;
+            }
+
+            deps.entry(rule.after)
+                .and_modify(|deps| {
+                    deps.insert(rule.before);
+                })
+                .or_insert_with(|| {
+                    let mut set: FxHashSet<usize> = FxHashSet::default();
+                    set.insert(rule.before);
+                    set
+                });
+        }
+
+        let mut reordered: Vec<usize> = Vec::with_capacity(self.pages.len());
+        while !self.pages.is_empty() {
+            let starting_size = self.pages.len();
+            self.pages.retain(|page| match deps.get(page) {
+                None => {
+                    reordered.push(*page);
+                    remove_val(&mut deps, page);
+
+                    false
+                }
+                _ => true,
+            });
+
+            let remaining_size = self.pages.len();
+
+            assert!(
+                remaining_size < starting_size,
+                "nothing removed in iteration, we will get stuck in infinite loop"
+            );
+        }
+
+        Self::new(reordered)
+    }
+}
+
+fn remove_val(map: &mut FxHashMap<usize, FxHashSet<usize>>, val: &usize) {
+    for vals in map.values_mut() {
+        vals.remove(val);
+    }
+
+    map.retain(|_, vals| !vals.is_empty())
 }
 
 impl FromStr for PageOrderList {
