@@ -9,6 +9,7 @@ color-eyre = "0.6.3"
 derive_more = { version = "1.0.0", features = ["full"] }
 eyre = "0.6.12"
 itertools = "0.13.0"
+rayon = "1.10.0"
 regex = "1.11.1"
 rustc-hash = "2.1.0"
 thiserror = "2.0.3"

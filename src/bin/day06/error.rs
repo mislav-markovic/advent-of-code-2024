@@ -22,4 +22,7 @@ pub(crate) enum Day06Error {
 
     #[error("failed to simulte guard movements: {why}")]
     MovementSimulationError { why: String },
+
+    #[error("guard stuck in loop")]
+    SimulationLoopError,
 }

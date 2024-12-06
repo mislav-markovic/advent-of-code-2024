@@ -1,10 +1,11 @@
-use std::{fmt::Debug, str::FromStr, usize};
+use std::{fmt::Debug, str::FromStr};
 
-use tracing::{debug, info};
+use rustc_hash::FxHashSet;
+use tracing::debug;
 
 use crate::error::Day06Error;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub(crate) enum Orientation {
     Up,
     Down,
@@ -12,12 +13,13 @@ pub(crate) enum Orientation {
     Right,
 }
 
-#[derive(Clone, Copy, Debug)]
-enum MapPosition {
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum MapPosition {
     Empty,
     Obstacle,
 }
 
+#[derive(Clone)]
 pub(crate) struct Map {
     content: Vec<Vec<MapPosition>>,
     guard_starting_position: (usize, usize),
@@ -96,12 +98,23 @@ impl Map {
         }
     }
 
-    fn at(&self, x: i32, y: i32) -> Option<MapPosition> {
+    pub(crate) fn at(&self, x: i32, y: i32) -> Option<MapPosition> {
         let (Ok(x), Ok(y)) = (usize::try_from(x), usize::try_from(y)) else {
             return None;
         };
 
-        self.content.get(y).map(|row| row.get(x)).flatten().cloned()
+        self.content.get(y).and_then(|row| row.get(x)).cloned()
+    }
+
+    pub(crate) fn set_at_position(&mut self, x: usize, y: usize, new_val: MapPosition) {
+        self.content[y][x] = new_val;
+    }
+
+    pub(crate) fn dimension(&self) -> (usize, usize) {
+        let width = self.content[0].len();
+        let height = self.content.len();
+
+        (width, height)
     }
 
     pub(crate) fn guard_starting_position(&self) -> (usize, usize) {
@@ -109,7 +122,7 @@ impl Map {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub(crate) struct Guard {
     position: (usize, usize),
     facing: Orientation,
@@ -159,12 +172,24 @@ impl Guard {
     }
 }
 
+#[derive(Debug, Hash, PartialEq, Eq)]
+struct LoopDetectionPosition((usize, usize), Orientation);
+
+impl From<&Guard> for LoopDetectionPosition {
+    fn from(value: &Guard) -> Self {
+        Self(value.position, value.facing)
+    }
+}
+
 pub(crate) fn simulate_guard_movement(
     mut guard: Guard,
     map: Map,
 ) -> Result<Vec<(usize, usize)>, Day06Error> {
-    let mut rv = Vec::with_capacity(1 << 12);
-    rv.push(guard.position);
+    let mut step_seq = Vec::with_capacity(1 << 12);
+    step_seq.push(guard.position);
+
+    let mut loop_detector: FxHashSet<LoopDetectionPosition> = FxHashSet::default();
+    loop_detector.insert((&guard).into());
 
     let mut rotation_count = 0;
     loop {
@@ -177,7 +202,7 @@ pub(crate) fn simulate_guard_movement(
         let next_planned_step = guard.next_step();
 
         let Some(next_content) = map.at(next_planned_step.0, next_planned_step.1) else {
-            info!(
+            debug!(
                 "next step will take us out of map! guard = {:?}; step = {}x{}",
                 guard, next_planned_step.0, next_planned_step.1
             );
@@ -193,7 +218,12 @@ pub(crate) fn simulate_guard_movement(
             MapPosition::Empty => {
                 guard.make_step()?;
                 debug!("moved to {}x{}", guard.position.0, guard.position.1);
-                rv.push(guard.position);
+                step_seq.push(guard.position);
+
+                if !loop_detector.insert((&guard).into()) {
+                    return Err(Day06Error::SimulationLoopError);
+                }
+
                 rotation_count = 0;
             }
             MapPosition::Obstacle => {
@@ -207,5 +237,5 @@ pub(crate) fn simulate_guard_movement(
         };
     }
 
-    Ok(rv)
+    Ok(step_seq)
 }
