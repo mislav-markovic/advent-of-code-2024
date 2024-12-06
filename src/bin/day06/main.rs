@@ -1,15 +1,29 @@
 mod error;
 mod models;
 
+use std::collections::HashSet;
+
 use advent_of_code_2024::{init, load_day_input};
 use eyre::Context;
+use models::{simulate_guard_movement, Guard, Map};
 use tracing::info;
+
+const SAMPLE: &str = r"....#.....
+.........#
+..........
+..#.......
+.......#..
+..........
+.#..^.....
+........#.
+#.........
+......#...";
 
 fn main() -> eyre::Result<()> {
     init();
 
     info!("loading data...");
-    let data = load_day_input("day03.txt")?;
+    let data = load_day_input("day06.txt")?;
 
     info!("solving part 1...");
     let part_1_res = part1(&data)?;
@@ -22,10 +36,34 @@ fn main() -> eyre::Result<()> {
     Ok(())
 }
 
-fn part1(data: &str) -> eyre::Result<u64> {
-    Ok(0)
+fn part1(data: &str) -> eyre::Result<usize> {
+    info!("parsing map...");
+    let map = data.parse::<Map>().wrap_err("failed to parse map")?;
+
+    let guard = Guard::new(map.guard_starting_position(), models::Orientation::Up);
+    info!("found guard at {:?}", guard);
+
+    info!("simulating guard movements...");
+    let steps =
+        simulate_guard_movement(guard, map).wrap_err("failed to simualte guard movements")?;
+    
+    let distinct = steps.into_iter().collect::<HashSet<_>>();
+
+    Ok(distinct.len())
 }
 
 fn part2(data: &str) -> eyre::Result<u64> {
     Ok(0)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn part_1_sample_data() {
+        let res = part1(SAMPLE).expect("part 1 not to error on sample data");
+
+        assert_eq!(41, res);
+    }
 }
