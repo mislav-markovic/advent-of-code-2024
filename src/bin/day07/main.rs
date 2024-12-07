@@ -7,6 +7,7 @@ use advent_of_code_2024::{init, load_day_input};
 use error::Day07Error;
 use eyre::Context;
 use models::{Equation, Operator};
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use tracing::info;
 
 fn main() -> eyre::Result<()> {
@@ -42,9 +43,11 @@ fn part1(data: &str) -> eyre::Result<u64> {
     let equations = load_equations(data).wrap_err("failed to parse equations")?;
 
     let rv = equations
-        .iter()
-        .filter(|eq| eq.is_solveable_with(&[Operator::Add, Operator::Mul]))
-        .map(|eq| eq.test_value())
+        .into_par_iter()
+        .filter_map(|eq| {
+            eq.is_solveable_with(&[Operator::Add, Operator::Mul])
+                .then_some(eq.test_value())
+        })
         .sum();
 
     Ok(rv)
@@ -54,9 +57,11 @@ fn part2(data: &str) -> eyre::Result<u64> {
     let equations = load_equations(data).wrap_err("failed to parse equations")?;
 
     let rv = equations
-        .iter()
-        .filter(|eq| eq.is_solveable_with(&[Operator::Add, Operator::Mul, Operator::Concatenation]))
-        .map(|eq| eq.test_value())
+        .into_par_iter()
+        .filter_map(|eq| {
+            eq.is_solveable_with(&[Operator::Add, Operator::Mul, Operator::Concatenation])
+                .then_some(eq.test_value())
+        })
         .sum();
 
     Ok(rv)
