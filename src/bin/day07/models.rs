@@ -3,21 +3,38 @@ use std::str::FromStr;
 
 use itertools::FoldWhile::{Continue, Done};
 use itertools::Itertools;
-use tracing::{debug, info, warn};
+use tracing::debug;
 
 use crate::error::Day07Error;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Operator {
+pub(crate) enum Operator {
     Add,
     Mul,
+    Concatenation,
 }
 
 impl Operator {
     fn apply(&self, lhs: u64, rhs: u64) -> u64 {
+        fn num_concat(mut lhs: u64, mut rhs: u64) -> u64 {
+            let mut rhs_digits = Vec::new();
+
+            while rhs > 0 {
+                let digit = rhs % 10;
+                rhs_digits.push(digit);
+                rhs /= 10;
+            }
+
+            for digit in rhs_digits.into_iter().rev() {
+                lhs = lhs * 10 + digit;
+            }
+            lhs
+        }
+
         match self {
             Operator::Add => lhs + rhs,
             Operator::Mul => lhs * rhs,
+            Operator::Concatenation => num_concat(lhs, rhs),
         }
     }
 }
@@ -27,6 +44,7 @@ impl Display for Operator {
         let v = match self {
             Operator::Add => "+",
             Operator::Mul => "*",
+            Operator::Concatenation => "||",
         };
 
         write!(f, "{v}")
@@ -47,7 +65,7 @@ impl Equation {
         }
     }
 
-    pub(crate) fn is_solveable(&self) -> bool {
+    pub(crate) fn is_solveable_with(&self, ops: &[Operator]) -> bool {
         if self.operands.is_empty() {
             return false;
         } else if self.operands.len() == 1 {
@@ -55,18 +73,15 @@ impl Equation {
         }
 
         let operator_slots = self.operands.len() - 1;
-        let combinations = 1 << operator_slots;
+        let combinations = ops.len().pow(operator_slots as u32);
+
         debug!("testing solveability for {testing_value} with {operand_count} operands and {operator_slots} operators with {combinations} combos", testing_value = self.test_value, operand_count = self.operands.len());
         let mut operators_buf = vec![Operator::Add; operator_slots].into_boxed_slice();
 
         for combination in 0..combinations {
-            make_combination_into(combination, &mut operators_buf);
+            make_combination_into(combination, ops, &mut operators_buf);
 
             if test_equation(&self.operands, &operators_buf, self.test_value) {
-                info!(
-                    "solved! {}",
-                    format_solved_equation(&self.operands, &operators_buf, self.test_value)
-                );
                 return true;
             }
         }
@@ -77,31 +92,6 @@ impl Equation {
     pub(crate) fn test_value(&self) -> u64 {
         self.test_value
     }
-}
-
-fn format_unsolved_equation(operands: &[u64], test_value: u64) -> String {
-    let mut buf = String::new();
-
-    buf.push_str(&format!("{test_value}:"));
-
-    operands.iter().fold(&mut buf, |acc, val| {
-        acc.push_str(&format!(" {val}"));
-        acc
-    });
-
-    buf
-}
-
-fn format_solved_equation(operands: &[u64], operators: &[Operator], test_value: u64) -> String {
-    let mut buf = String::new();
-
-    buf.push_str(&format!("{test_value}: {}", operands[0]));
-
-    for (val, op) in operands[1..].iter().zip_eq(operators.iter()) {
-        buf.push_str(&format!(" {op} {val}"));
-    }
-
-    buf
 }
 
 impl FromStr for Equation {
@@ -138,17 +128,15 @@ impl FromStr for Equation {
     }
 }
 
-fn make_combination_into(bitflags: usize, buf: &mut [Operator]) {
-    let max_idx = buf.len() - 1;
+fn make_combination_into(mut combination_id: usize, op_choice: &[Operator], buf: &mut [Operator]) {
+    let max_id_allowed = (op_choice.len() as u32).pow(buf.len() as u32) as usize;
+    debug_assert!(combination_id < max_id_allowed, "combination id too large");
 
-    for idx in 0..buf.len() {
-        let op = if (bitflags & (1 << idx)) != 0 {
-            Operator::Mul
-        } else {
-            Operator::Add
-        };
+    for buf_idx in (0..buf.len()).rev() {
+        let choose_op = combination_id % op_choice.len();
+        combination_id /= op_choice.len();
 
-        buf[max_idx - idx] = op;
+        buf[buf_idx] = op_choice[choose_op];
     }
 }
 
@@ -176,4 +164,34 @@ fn test_equation(operands: &[u64], operators: &[Operator], test_value: u64) -> b
         .into_inner();
 
     val == test_value
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn all_combinations_made() {
+        use Operator as Op;
+
+        let op_choice = [Op::Add, Op::Mul, Op::Concatenation];
+        let mut buf = vec![Op::Add; 2];
+
+        let results = [
+            [Op::Add, Op::Add],
+            [Op::Add, Op::Mul],
+            [Op::Add, Op::Concatenation],
+            [Op::Mul, Op::Add],
+            [Op::Mul, Op::Mul],
+            [Op::Mul, Op::Concatenation],
+            [Op::Concatenation, Op::Add],
+            [Op::Concatenation, Op::Mul],
+            [Op::Concatenation, Op::Concatenation],
+        ];
+
+        for id in 0..9 {
+            make_combination_into(id, &op_choice, &mut buf);
+            assert_eq!(results[id][..], buf[..]);
+        }
+    }
 }

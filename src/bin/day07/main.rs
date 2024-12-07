@@ -6,7 +6,7 @@ use std::time::Instant;
 use advent_of_code_2024::{init, load_day_input};
 use error::Day07Error;
 use eyre::Context;
-use models::Equation;
+use models::{Equation, Operator};
 use tracing::info;
 
 fn main() -> eyre::Result<()> {
@@ -43,15 +43,23 @@ fn part1(data: &str) -> eyre::Result<u64> {
 
     let rv = equations
         .iter()
-        .filter(|eq| eq.is_solveable())
+        .filter(|eq| eq.is_solveable_with(&[Operator::Add, Operator::Mul]))
         .map(|eq| eq.test_value())
         .sum();
 
     Ok(rv)
 }
 
-fn part2(data: &str) -> eyre::Result<usize> {
-    Ok(0)
+fn part2(data: &str) -> eyre::Result<u64> {
+    let equations = load_equations(data).wrap_err("failed to parse equations")?;
+
+    let rv = equations
+        .iter()
+        .filter(|eq| eq.is_solveable_with(&[Operator::Add, Operator::Mul, Operator::Concatenation]))
+        .map(|eq| eq.test_value())
+        .sum();
+
+    Ok(rv)
 }
 
 fn load_equations(data: &str) -> Result<Vec<Equation>, Day07Error> {
@@ -77,5 +85,12 @@ mod tests {
         let res = part1(SAMPLE).expect("part 1 not to error on sample data");
 
         assert_eq!(3749, res);
+    }
+
+    #[test]
+    fn part_2_sample_data() {
+        let res = part2(SAMPLE).expect("part 2 not to error on sample data");
+
+        assert_eq!(11387, res);
     }
 }
