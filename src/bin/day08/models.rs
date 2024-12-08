@@ -27,6 +27,14 @@ impl Dimension {
     fn new(width: usize, height: usize) -> Self {
         Self { width, height }
     }
+
+    fn contains(&self, pos: &Pos) -> bool {
+        if let (Ok(x), Ok(y)) = (usize::try_from(pos.x), usize::try_from(pos.y)) {
+            x <= self.width && y <= self.height
+        } else {
+            false
+        }
+    }
 }
 
 struct Vector {
@@ -82,35 +90,34 @@ impl TryFrom<char> for AntennaId {
 
 #[derive(Clone, Debug)]
 struct Antenna {
-    id: AntennaId,
+    _id: AntennaId,
     pos: Pos,
 }
 
 impl Antenna {
     fn new(id: AntennaId, pos: Pos) -> Self {
-        Self { id, pos }
+        Self { _id: id, pos }
     }
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub(crate) struct AntiNode {
-    for_antenna: AntennaId,
     pos: Pos,
 }
 
 impl AntiNode {
-    fn new(for_antenna: AntennaId, pos: Pos) -> Self {
-        Self { for_antenna, pos }
+    fn new(pos: Pos) -> Self {
+        Self { pos }
     }
 
-    fn for_frequency(id: AntennaId, a: &Pos, b: &Pos) -> (Self, Self) {
+    fn for_frequency_pair(a: &Pos, b: &Pos) -> (Self, Self) {
         let vec = Vector::from_to(a, b);
         let short_b = vec.apply(b);
 
         let vec = vec.reverse();
         let short_a = vec.apply(a);
 
-        (Self::new(id.clone(), short_a), Self::new(id, short_b))
+        (Self::new(short_a), Self::new(short_b))
     }
 
     pub(crate) fn pos(&self) -> &Pos {
@@ -129,23 +136,19 @@ impl CityMap {
     }
 
     pub(crate) fn is_in_bounds(&self, pos: &Pos) -> bool {
-        if let (Ok(x), Ok(y)) = (usize::try_from(pos.x), usize::try_from(pos.y)) {
-            x <= self.dim.width && y <= self.dim.height
-        } else {
-            false
-        }
+        self.dim.contains(pos)
     }
 
     pub(crate) fn antinodes(&self) -> Vec<AntiNode> {
         let mut rv = Vec::new();
 
-        for (id, antenna_frequency) in self.antennas.iter() {
+        for antenna_frequency in self.antennas.values() {
             let antinodes = antenna_frequency
                 .iter()
                 .cartesian_product(antenna_frequency.iter())
                 .filter(|(l, r)| l.pos != r.pos)
                 .flat_map(|(a, b)| {
-                    let (a, b) = AntiNode::for_frequency(id.clone(), &a.pos, &b.pos);
+                    let (a, b) = AntiNode::for_frequency_pair(&a.pos, &b.pos);
                     [a, b]
                 });
 
@@ -155,6 +158,48 @@ impl CityMap {
         rv.shrink_to_fit();
         rv
     }
+
+    pub(crate) fn resonant_antinodes(&self) -> Vec<AntiNode> {
+        let mut rv = Vec::new();
+
+        for antenna_frequency in self.antennas.values() {
+            let antinodes = antenna_frequency
+                .iter()
+                .cartesian_product(antenna_frequency.iter())
+                .filter(|(l, r)| l.pos != r.pos)
+                .flat_map(|(a, b)| node_resonants(&a.pos, &b.pos, &self.dim))
+                .map(AntiNode::new);
+
+            rv.extend(antinodes);
+        }
+
+        rv.shrink_to_fit();
+        rv
+    }
+}
+
+fn node_resonants(a: &Pos, b: &Pos, within: &Dimension) -> Vec<Pos> {
+    let mut rv = Vec::new();
+
+    // from a to b
+    let v = Vector::from_to(a, b);
+    let mut next = v.apply(a);
+
+    while within.contains(&next) {
+        rv.push(next.clone());
+        next = v.apply(&next);
+    }
+
+    // from b to a
+    let v = Vector::from_to(b, a);
+    let mut next = v.apply(b);
+
+    while within.contains(&next) {
+        rv.push(next.clone());
+        next = v.apply(&next);
+    }
+
+    rv
 }
 
 impl FromStr for CityMap {

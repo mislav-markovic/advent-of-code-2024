@@ -4,7 +4,6 @@ mod models;
 use std::time::Instant;
 
 use advent_of_code_2024::{init, load_day_input};
-use error::Day08Error;
 use eyre::Context;
 use models::{CityMap, Pos};
 use rustc_hash::FxHashSet;
@@ -56,7 +55,19 @@ fn part1(data: &str) -> eyre::Result<usize> {
 }
 
 fn part2(data: &str) -> eyre::Result<usize> {
-    Ok(0)
+    let map = data
+        .parse::<CityMap>()
+        .wrap_err("failed to parse data into city map")?;
+
+    let antinodes = map.resonant_antinodes();
+
+    let antinodes = antinodes
+        .into_iter()
+        .filter(|an| map.is_in_bounds(an.pos()))
+        .map(|an| an.pos().clone())
+        .collect::<FxHashSet<Pos>>();
+
+    Ok(antinodes.len())
 }
 
 #[cfg(test)]
@@ -88,6 +99,6 @@ mod tests {
         let res = part2(SAMPLE).expect("part 2 not to error on sample data");
 
         // TODO when we get example for part 2
-        assert_eq!(0, res);
+        assert_eq!(34, res);
     }
 }
