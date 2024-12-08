@@ -6,6 +6,8 @@ use std::time::Instant;
 use advent_of_code_2024::{init, load_day_input};
 use error::Day08Error;
 use eyre::Context;
+use models::{CityMap, Pos};
+use rustc_hash::FxHashSet;
 use tracing::info;
 
 fn main() -> eyre::Result<()> {
@@ -37,11 +39,23 @@ fn main() -> eyre::Result<()> {
     Ok(())
 }
 
-fn part1(data: &str) -> eyre::Result<u64> {
-    Ok(0)
+fn part1(data: &str) -> eyre::Result<usize> {
+    let map = data
+        .parse::<CityMap>()
+        .wrap_err("failed to parse data into city map")?;
+
+    let antinodes = map.antinodes();
+
+    let antinodes = antinodes
+        .into_iter()
+        .filter(|an| map.is_in_bounds(an.pos()))
+        .map(|an| an.pos().clone())
+        .collect::<FxHashSet<Pos>>();
+
+    Ok(antinodes.len())
 }
 
-fn part2(data: &str) -> eyre::Result<u64> {
+fn part2(data: &str) -> eyre::Result<usize> {
     Ok(0)
 }
 
