@@ -40,17 +40,25 @@ fn main() -> eyre::Result<()> {
 fn part1(data: &str) -> eyre::Result<u64> {
     let mut disk_map = data.parse::<DiskMap>().wrap_err("failed to parse input")?;
 
-    info!("defragment disk...");
-    disk_map.defragment();
+    info!("compact disk memort...");
+    disk_map.compact_memory();
 
-    info!("get disk checksum");
+    info!("get disk checksum...");
     let checksum = disk_map.checksum();
 
     Ok(checksum)
 }
 
 fn part2(data: &str) -> eyre::Result<u64> {
-    Ok(0)
+    let mut disk_map = data.parse::<DiskMap>().wrap_err("failed to parse input")?;
+
+    info!("defragment disk...");
+    disk_map.defragment();
+
+    info!("get disk checksum...");
+    let checksum = disk_map.checksum();
+
+    Ok(checksum)
 }
 
 #[cfg(test)]
@@ -60,12 +68,12 @@ mod tests {
     pub const SAMPLE: &str = "2333133121414131402";
 
     #[test]
-    fn short_example() {
+    fn short_example_for_compact() {
         const INPUT: &str = "12345";
         const EXPECTED: &str = "022111222";
 
         let mut disk = INPUT.parse::<DiskMap>().expect("input parse to work");
-        disk.defragment();
+        disk.compact_memory();
         let result = disk.show();
 
         assert_eq!(EXPECTED, result)
@@ -82,8 +90,19 @@ mod tests {
     }
 
     #[test]
-    fn long_example_correctly_defragged() {
+    fn long_example_correctly_compacted() {
         const EXPECTED: &str = "0099811188827773336446555566";
+
+        let mut disk = SAMPLE.parse::<DiskMap>().expect("input parse to work");
+        disk.compact_memory();
+        let original = disk.show();
+
+        assert_eq!(EXPECTED, original)
+    }
+
+    #[test]
+    fn long_example_correctly_defragmented() {
+        const EXPECTED: &str = "00992111777.44.333....5555.6666.....8888";
 
         let mut disk = SAMPLE.parse::<DiskMap>().expect("input parse to work");
         disk.defragment();
@@ -103,7 +122,6 @@ mod tests {
     fn part_2_sample_data() {
         let res = part2(SAMPLE).expect("part 2 not to error on sample data");
 
-        // TODO when we get example for part 2
-        assert_eq!(0, res);
+        assert_eq!(2858, res);
     }
 }

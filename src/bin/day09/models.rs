@@ -1,3 +1,4 @@
+use core::panic;
 use std::{cmp::Reverse, collections::BinaryHeap, str::FromStr};
 
 use crate::error::Day09Error;
@@ -24,13 +25,13 @@ struct MemoryRegion {
 
 impl MemoryRegion {
     fn from_to(from: usize, to: usize) -> Self {
-        if from == to {
-            panic!("memory region can not be empty! {from} == {to}");
-        } else if to < from {
-            panic!("memory region reversed! to < from: {to} < {from}")
+        match from.cmp(&to) {
+            std::cmp::Ordering::Less => Self { from, to },
+            std::cmp::Ordering::Equal => panic!("memory region can not be empty! {from} == {to}"),
+            std::cmp::Ordering::Greater => {
+                panic!("memory region reversed! to < from: {to} < {from}")
+            }
         }
-
-        Self { from, to }
     }
 
     fn from_with_count(from: usize, count: usize) -> Self {
@@ -79,26 +80,11 @@ impl MemoryRegion {
             Self::from_to(self.from + how_much, self.to),
         )
     }
-
-    fn can_append(&self, other: &Self) -> bool {
-        self.to == other.from
-    }
-
-    fn append_region(self, other: Self) -> Self {
-        if !self.can_append(&other) {
-            panic!(
-                "can only append neighbouring region! me: {:?}; other: {:?}",
-                self, other
-            );
-        }
-
-        Self::from_to(self.from, other.to)
-    }
 }
 
 impl PartialOrd for MemoryRegion {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.from.partial_cmp(&other.from)
+        Some(self.cmp(other))
     }
 }
 
@@ -174,7 +160,7 @@ impl PartialEq for AllocatedRegion {
 
 impl PartialOrd for AllocatedRegion {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.region.partial_cmp(&other.region)
+        Some(self.cmp(other))
     }
 }
 
@@ -205,7 +191,7 @@ impl DiskMap {
         self.allocs.iter().map(|a| a.checksum()).sum()
     }
 
-    pub(crate) fn defragment(&mut self) {
+    pub(crate) fn compact_memory(&mut self) {
         if self.free_space.is_empty() || self.allocs.is_empty() {
             return;
         }
@@ -244,6 +230,82 @@ impl DiskMap {
         }
     }
 
+    pub(crate) fn defragment(&mut self) {
+        if self.free_space.is_empty() || self.allocs.is_empty() {
+            return;
+        }
+
+        let mut seen_allocs = Vec::new();
+        let mut free_mem_holder = Vec::new();
+        while let Some(alloc) = self.allocs.pop() {
+            if !free_mem_holder.is_empty() {
+                self.free_space
+                    .extend(free_mem_holder.drain(..).map(Reverse));
+            }
+
+            // either we no longer have any free space, or first free space is after last
+            // allocation
+            if self
+                .free_space
+                .peek()
+                .map_or(true, |mem| mem.0 > alloc.region)
+            {
+                seen_allocs.push(alloc);
+                break;
+            }
+
+            let mut target_region: Option<MemoryRegion> = None;
+            // while we have free memory regions and they are before allocation we are trying to
+            // move
+            while self
+                .free_space
+                .peek()
+                .map_or(false, |mem| mem.0 < alloc.region)
+            {
+                // pop it from collection, it is either what we are looking for, or it is not
+                // needed for moving this allocation
+                let candidate_mem = self.free_space.pop().unwrap().0;
+
+                if candidate_mem.size() >= alloc.region.size() {
+                    target_region = Some(candidate_mem);
+                    break;
+                }
+
+                free_mem_holder.push(candidate_mem);
+            }
+
+            // we didn't find large enoung memory region to move this allocation
+            let Some(target_region) = target_region else {
+                seen_allocs.push(alloc);
+                continue;
+            };
+
+            let (moved_alloc, res) = alloc.reallocate(target_region);
+            seen_allocs.push(moved_alloc);
+
+            match res {
+                ReallocMemResult::DataRemainig(_, _) => {
+                    panic!(
+                        "we partially moved allocation during defragment, this should never happen"
+                    )
+                }
+                ReallocMemResult::FreeSpaceRemaining(free_mem_1, free_mem_2) => {
+                    self.free_space.push(Reverse(free_mem_1));
+                    self.free_space.push(Reverse(free_mem_2));
+                }
+                ReallocMemResult::ExactMove(memory_region) => {
+                    self.free_space.push(Reverse(memory_region));
+                }
+            };
+        }
+
+        // return resources to their collections
+        self.free_space
+            .extend(free_mem_holder.drain(..).map(Reverse));
+        self.allocs.extend(seen_allocs);
+    }
+
+    #[cfg(test)]
     pub(crate) fn show(&self) -> String {
         let last_idx = self.allocs.peek().unwrap().region.to;
 
