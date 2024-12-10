@@ -1,6 +1,6 @@
 use std::{cmp, collections::VecDeque, str::FromStr};
 
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashMap;
 
 use crate::error::Day10Error;
 
@@ -16,7 +16,7 @@ impl Dim {
     }
 }
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
 pub(crate) struct Coordinate {
     pub(crate) x: usize,
     pub(crate) y: usize,
@@ -59,21 +59,21 @@ impl Height {
 }
 
 pub(crate) struct Trailhead {
-    start: Coordinate,
     score: usize,
+    rating: usize,
 }
 
 impl Trailhead {
-    fn new(start: Coordinate, score: usize) -> Self {
-        Self { start, score }
-    }
-
-    pub(crate) fn start(&self) -> &Coordinate {
-        &self.start
+    fn new(score: usize, rating: usize) -> Self {
+        Self { score, rating }
     }
 
     pub(crate) fn score(&self) -> usize {
         self.score
+    }
+
+    pub(crate) fn rating(&self) -> usize {
+        self.rating
     }
 }
 
@@ -183,17 +183,23 @@ impl Map {
             }
         }
 
-        let mut trailheads_map: FxHashMap<Coordinate, FxHashSet<Coordinate>> = FxHashMap::default();
+        let mut trailheads_map: FxHashMap<Coordinate, Vec<Coordinate>> = FxHashMap::default();
         for trail in completed_trails {
             trailheads_map
                 .entry(trail.start)
                 .or_default()
-                .insert(trail.current_pos);
+                .push(trail.current_pos);
         }
 
         trailheads_map
-            .into_iter()
-            .map(|(k, v)| Trailhead::new(k, v.len()))
+            .into_values()
+            .map(|mut v| {
+                let rating = v.len();
+                v.sort();
+                v.dedup();
+                let score = v.len();
+                Trailhead::new(score, rating)
+            })
             .collect()
     }
 }

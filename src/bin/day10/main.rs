@@ -48,7 +48,13 @@ fn part1(data: &str) -> eyre::Result<usize> {
 }
 
 fn part2(data: &str) -> eyre::Result<usize> {
-    Ok(0)
+    let map = data.parse::<Map>().wrap_err("failed to parse map")?;
+
+    let trailheads = map.trailheads();
+
+    let total_rating = trailheads.iter().map(|th| th.rating()).sum();
+
+    Ok(total_rating)
 }
 
 #[cfg(test)]
@@ -90,6 +96,6 @@ mod tests {
     fn part_2_sample_data() {
         let res = part2(SAMPLE).expect("part 2 not to error on sample data");
 
-        assert_eq!(0, res);
+        assert_eq!(81, res);
     }
 }
