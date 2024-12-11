@@ -5,6 +5,7 @@ use std::time::Instant;
 
 use advent_of_code_2024::{init, load_day_input};
 use eyre::Context;
+use models::StoneLine;
 use tracing::info;
 
 fn main() -> eyre::Result<()> {
@@ -37,7 +38,18 @@ fn main() -> eyre::Result<()> {
 }
 
 fn part1(data: &str) -> eyre::Result<usize> {
-    Ok(9)
+    let mut stone_line = data
+        .parse::<StoneLine>()
+        .wrap_err("could not parse input into stone line")?;
+    let iterations = 25;
+
+    for _ in 0..iterations {
+        stone_line.blink();
+    }
+
+    let len = stone_line.len();
+
+    Ok(len)
 }
 
 fn part2(data: &str) -> eyre::Result<usize> {
@@ -55,6 +67,20 @@ mod tests {
         let res = part1(SAMPLE).expect("part 1 not to error on sample data");
 
         assert_eq!(55312, res);
+    }
+
+    #[test]
+    fn blink_6_times() {
+        let mut stone_line = SAMPLE.parse::<StoneLine>().expect("to parse sample");
+
+        let iterations = 6;
+
+        assert_eq!(2, stone_line.len());
+        for _ in 0..iterations {
+            stone_line.blink();
+        }
+
+        assert_eq!(22, stone_line.len());
     }
 
     #[test]
