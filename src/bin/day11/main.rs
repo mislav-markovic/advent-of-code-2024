@@ -53,7 +53,18 @@ fn part1(data: &str) -> eyre::Result<usize> {
 }
 
 fn part2(data: &str) -> eyre::Result<usize> {
-    Ok(0)
+    let mut stone_line = data
+        .parse::<StoneLine>()
+        .wrap_err("could not parse input into stone line")?;
+    let iterations = 75;
+
+    for _ in 0..iterations {
+        stone_line.blink();
+    }
+
+    let len = stone_line.len();
+
+    Ok(len)
 }
 
 #[cfg(test)]
@@ -67,6 +78,34 @@ mod tests {
         let res = part1(SAMPLE).expect("part 1 not to error on sample data");
 
         assert_eq!(55312, res);
+    }
+
+    #[test]
+    fn blink_3_times() {
+        let mut stone_line = SAMPLE.parse::<StoneLine>().expect("to parse sample");
+
+        let iterations = 3;
+
+        assert_eq!(2, stone_line.len());
+        for _ in 0..iterations {
+            stone_line.blink();
+        }
+
+        assert_eq!(5, stone_line.len());
+    }
+
+    #[test]
+    fn blink_5_times() {
+        let mut stone_line = SAMPLE.parse::<StoneLine>().expect("to parse sample");
+
+        let iterations = 5;
+
+        assert_eq!(2, stone_line.len());
+        for _ in 0..iterations {
+            stone_line.blink();
+        }
+
+        assert_eq!(13, stone_line.len());
     }
 
     #[test]

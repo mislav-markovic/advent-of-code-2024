@@ -1,12 +1,37 @@
-use core::panic;
-use std::{collections::VecDeque, str::FromStr};
+use std::{hash::Hash, str::FromStr};
+
+use rustc_hash::FxHashMap;
 
 use crate::error::Day11Error;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Eq)]
 struct Stone {
     value: u128,
     digit_count: u8,
+}
+
+impl Hash for Stone {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.value.hash(state);
+    }
+}
+
+impl PartialEq for Stone {
+    fn eq(&self, other: &Self) -> bool {
+        self.value.eq(&other.value)
+    }
+}
+
+impl PartialOrd for Stone {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Stone {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.value.cmp(&other.value)
+    }
 }
 
 impl Stone {
@@ -35,10 +60,10 @@ impl Stone {
 
             if digit_counter < digit_mid {
                 let add = digit as u128 * 10u128.pow(digit_counter);
-                right_value = right_value + add;
+                right_value += add;
             } else {
                 let add = digit as u128 * 10u128.pow(digit_counter - digit_mid);
-                left_value = left_value + add;
+                left_value += add;
             }
 
             digit_counter += 1;
@@ -48,45 +73,116 @@ impl Stone {
     }
 }
 
+#[derive(Debug, Clone)]
+enum StoneProcessResult {
+    Split(Stone, Stone),
+    Inc(Stone),
+}
+
+#[derive(Debug, Clone)]
+struct StoneCacheItem {
+    res: StoneProcessResult,
+    count: usize,
+}
+
+impl StoneCacheItem {
+    fn new(res: StoneProcessResult, initial_count: usize) -> Self {
+        let count = initial_count;
+        Self { res, count }
+    }
+
+    fn inc(&mut self, count: usize) {
+        self.count += count
+    }
+    fn dec(&mut self, count: usize) {
+        self.count -= count
+    }
+}
+
+fn process_stone(stone: Stone) -> StoneProcessResult {
+    if stone.value == 0 {
+        StoneProcessResult::Inc(stone.replace_with(1))
+    } else if stone.digit_count % 2 == 0 {
+        let (left, right) = stone.split();
+        StoneProcessResult::Split(left, right)
+    } else {
+        let Some(new) = stone.value.checked_mul(2024) else {
+            panic!(
+                "overflow detected! can not multiply {} with 2024",
+                stone.value
+            );
+        };
+
+        StoneProcessResult::Inc(stone.replace_with(new))
+    }
+}
+
 pub(crate) struct StoneLine {
-    line: VecDeque<Stone>,
+    stones: FxHashMap<Stone, StoneCacheItem>,
+    blink_buf: Vec<(Stone, StoneProcessResult, usize)>,
+    blink_count: usize,
 }
 
 impl StoneLine {
-    fn new(line: VecDeque<Stone>) -> Self {
-        Self { line }
+    fn new(line: Vec<Stone>) -> Self {
+        let mut stones: FxHashMap<Stone, StoneCacheItem> = FxHashMap::default();
+
+        for stone in line {
+            stones
+                .entry(stone.clone())
+                .and_modify(|item| item.inc(1))
+                .or_insert_with(|| StoneCacheItem::new(process_stone(stone), 1));
+        }
+
+        let blink_buf = Vec::new();
+        let blink_count = 0;
+        Self {
+            stones,
+            blink_buf,
+            blink_count,
+        }
     }
 
     pub(crate) fn blink(&mut self) {
-        let current_len = self.len();
+        self.blink_count += 1;
 
-        for _ in 0..current_len {
-            let Some(stone) = self.line.pop_front() else {
-                panic!("expected to find {current_len} items in line, but we ran out")
-            };
+        for (stone, res) in self.stones.iter().filter(|(_, item)| item.count > 0) {
+            self.blink_buf
+                .push((stone.clone(), res.res.clone(), res.count));
+        }
 
-            // rules in order of priority
-            if stone.value == 0 {
-                self.line.push_back(stone.replace_with(1));
-            } else if stone.digit_count % 2 == 0 {
-                let (left, right) = stone.split();
-                self.line.push_back(left);
-                self.line.push_back(right);
-            } else {
-                let Some(new) = stone.value.checked_mul(2024) else {
-                    panic!(
-                        "overflow detected! can not multiply {} with 2024",
-                        stone.value
-                    );
-                };
+        for (stone, res, count) in self.blink_buf.drain(..) {
+            self.stones
+                .get_mut(&stone)
+                .expect("must exist at this point in cache")
+                .dec(count);
 
-                self.line.push_back(stone.replace_with(new));
+            match res {
+                StoneProcessResult::Split(left, right) => {
+                    self.stones
+                        .entry(left.clone())
+                        .and_modify(|item| item.inc(count))
+                        .or_insert_with(|| StoneCacheItem::new(process_stone(left), count));
+                    self.stones
+                        .entry(right.clone())
+                        .and_modify(|item| item.inc(count))
+                        .or_insert_with(|| StoneCacheItem::new(process_stone(right), count));
+                }
+                StoneProcessResult::Inc(new_stone) => {
+                    self.stones
+                        .entry(new_stone.clone())
+                        .and_modify(|item| item.inc(count))
+                        .or_insert_with(|| StoneCacheItem::new(process_stone(new_stone), count));
+                }
             }
         }
     }
 
     pub(crate) fn len(&self) -> usize {
-        self.line.len()
+        self.stones
+            .values()
+            .filter_map(|item| (item.count > 0).then_some(item.count))
+            .sum()
     }
 }
 
@@ -96,8 +192,8 @@ impl FromStr for StoneLine {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let stones = s
             .split_ascii_whitespace()
-            .map(|val| val.parse::<u128>().map(|v| Stone::new(v)))
-            .collect::<Result<VecDeque<_>, _>>()
+            .map(|val| val.parse::<u128>().map(Stone::new))
+            .collect::<Result<Vec<_>, _>>()
             .map_err(|parse_err| Day11Error::StoneLineParseError {
                 input: s.to_owned(),
                 error_msg: format!("can not parse to u128! {parse_err}"),
@@ -163,5 +259,149 @@ mod tests {
         let (left, right) = stone.split();
         assert_eq!(2, left.digit_count);
         assert_eq!(2, right.digit_count);
+    }
+
+    #[test]
+    fn stone_line_state_correct_after_1_blink() {
+        let starting_stones = vec![Stone::new(125), Stone::new(17)];
+        let mut stone_line = StoneLine::new(starting_stones.clone());
+
+        assert_eq!(2, stone_line.len());
+
+        for stone in starting_stones.iter() {
+            let s = stone_line
+                .stones
+                .get(&stone)
+                .expect("starting stone must exist");
+            assert_eq!(1, s.count);
+        }
+
+        stone_line.blink();
+
+        assert_eq!(3, stone_line.len());
+
+        for stone in starting_stones.iter() {
+            let s = stone_line
+                .stones
+                .get(&stone)
+                .expect("starting stone must exist");
+            assert_eq!(0, s.count);
+        }
+
+        let blink_1_expected_stones = vec![Stone::new(253000), Stone::new(1), Stone::new(7)];
+        for stone in blink_1_expected_stones.iter() {
+            let s = stone_line
+                .stones
+                .get(&stone)
+                .expect("starting stone must exist");
+            assert_eq!(1, s.count);
+        }
+    }
+
+    #[test]
+    fn split_example_works() {
+        let num = 28676032;
+        let stone = Stone::new(num);
+
+        let (left, right) = stone.split();
+
+        assert_eq!(2867, left.value);
+        assert_eq!(6032, right.value);
+    }
+
+    #[test]
+    fn blink_3_times_test() {
+        let starting_stones = vec![Stone::new(125), Stone::new(17)];
+        let mut stone_line = StoneLine::new(starting_stones.clone());
+
+        assert_eq!(2, stone_line.len());
+
+        stone_line.blink();
+        assert_eq!(3, stone_line.len());
+
+        stone_line.blink();
+        assert_eq!(4, stone_line.len());
+
+        stone_line.blink();
+        assert_eq!(5, stone_line.len());
+
+        let blink_1_expected_stones = vec![
+            Stone::new(512072),
+            Stone::new(1),
+            Stone::new(20),
+            Stone::new(24),
+            Stone::new(28676032),
+        ];
+        for stone in blink_1_expected_stones.iter() {
+            let s = stone_line
+                .stones
+                .get(&stone)
+                .expect("starting stone must exist");
+            assert_eq!(1, s.count);
+        }
+    }
+
+    #[test]
+    fn blink_splits_into_same_stone_works() {
+        let starting_stones = vec![Stone::new(2020), Stone::new(20)];
+        let mut stone_line = StoneLine::new(starting_stones.clone());
+
+        assert_eq!(
+            1,
+            stone_line
+                .stones
+                .get(&Stone::new(2020))
+                .expect("must exist")
+                .count
+        );
+
+        assert_eq!(
+            1,
+            stone_line
+                .stones
+                .get(&Stone::new(20))
+                .expect("must exist")
+                .count
+        );
+
+        assert_eq!(2, stone_line.len());
+
+        stone_line.blink();
+
+        assert_eq!(4, stone_line.len());
+
+        assert_eq!(
+            0,
+            stone_line
+                .stones
+                .get(&Stone::new(2020))
+                .expect("must exist")
+                .count
+        );
+
+        assert_eq!(
+            2,
+            stone_line
+                .stones
+                .get(&Stone::new(20))
+                .expect("must exist")
+                .count
+        );
+        assert_eq!(
+            1,
+            stone_line
+                .stones
+                .get(&Stone::new(2))
+                .expect("must exist")
+                .count
+        );
+        assert_eq!(
+            1,
+            stone_line
+                .stones
+                .get(&Stone::new(0))
+                .expect("must exist")
+                .count
+        );
     }
 }
