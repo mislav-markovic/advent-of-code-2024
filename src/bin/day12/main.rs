@@ -5,6 +5,7 @@ use std::time::Instant;
 
 use advent_of_code_2024::{init, load_day_input};
 use eyre::Context;
+use models::{FencedGarden, Garden};
 use tracing::info;
 
 fn main() -> eyre::Result<()> {
@@ -37,7 +38,18 @@ fn main() -> eyre::Result<()> {
 }
 
 fn part1(data: &str) -> eyre::Result<usize> {
-    Ok(0)
+    let garden = data
+        .parse::<Garden>()
+        .wrap_err("failed to parse data into garden")?;
+
+    let fenced_garden: FencedGarden = garden.into();
+    let total_cost = fenced_garden.total_cost();
+
+    for region in fenced_garden.regions {
+        info!("{region}");
+    }
+
+    Ok(total_cost)
 }
 
 fn part2(data: &str) -> eyre::Result<usize> {
@@ -63,7 +75,7 @@ MMMISSJEEE";
     fn part_1_sample_data() {
         let res = part1(SAMPLE).expect("part 1 not to error on sample data");
 
-        assert_eq!(55312, res);
+        assert_eq!(1930, res);
     }
 
     #[test]
