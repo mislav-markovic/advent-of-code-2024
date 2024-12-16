@@ -45,15 +45,18 @@ fn part1(data: &str) -> eyre::Result<usize> {
     let fenced_garden: FencedGarden = garden.into();
     let total_cost = fenced_garden.total_cost();
 
-    for region in fenced_garden.regions {
-        info!("{region}");
-    }
-
     Ok(total_cost)
 }
 
 fn part2(data: &str) -> eyre::Result<usize> {
-    Ok(0)
+    let garden = data
+        .parse::<Garden>()
+        .wrap_err("failed to parse data into garden")?;
+
+    let fenced_garden: FencedGarden = garden.into();
+    let total_cost = fenced_garden.discount_cost();
+
+    Ok(total_cost)
 }
 
 #[cfg(test)]
@@ -82,6 +85,6 @@ MMMISSJEEE";
     fn part_2_sample_data() {
         let res = part2(SAMPLE).expect("part 2 not to error on sample data");
 
-        assert_eq!(0, res);
+        assert_eq!(1206, res);
     }
 }

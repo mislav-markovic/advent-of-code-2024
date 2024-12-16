@@ -1,7 +1,7 @@
 use std::{fmt::Display, str::FromStr};
 
+use itertools::Itertools;
 use rustc_hash::{FxHashMap, FxHashSet};
-use tracing::{info, warn};
 
 use crate::error::Day12Error;
 
@@ -41,6 +41,14 @@ impl Coord {
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
 struct PlantType(u8);
+
+impl Display for PlantType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let c = char::from(self.0);
+
+        write!(f, "{c}")
+    }
+}
 
 impl TryFrom<char> for PlantType {
     type Error = Day12Error;
@@ -94,6 +102,120 @@ impl Region {
     fn perimeter(&self) -> usize {
         self.plots.iter().map(|p| p.fenced_borders).sum()
     }
+
+    fn sides(&self) -> usize {
+        let mut border_plots_by_x: FxHashMap<usize, Vec<usize>> = FxHashMap::default();
+        let mut border_plots_by_y: FxHashMap<usize, Vec<usize>> = FxHashMap::default();
+
+        let mut all_coords: FxHashSet<Coord> = FxHashSet::default();
+
+        for plot in self.plots.iter() {
+            let Coord { x, y } = plot.pos;
+
+            all_coords.insert(plot.pos.clone());
+
+            if plot.fenced_borders > 0 {
+                border_plots_by_x
+                    .entry(x)
+                    .and_modify(|ys| ys.push(y))
+                    .or_insert_with(|| vec![y]);
+
+                border_plots_by_y
+                    .entry(y)
+                    .and_modify(|xs| xs.push(x))
+                    .or_insert_with(|| vec![x]);
+            }
+        }
+
+        for ys in border_plots_by_x.values_mut() {
+            ys.sort_unstable();
+        }
+
+        for xs in border_plots_by_y.values_mut() {
+            xs.sort_unstable();
+        }
+
+        fn has_left_fence(pos: &Coord, all_coords: &FxHashSet<Coord>) -> bool {
+            pos.x == 0 || !all_coords.contains(&Coord::new(pos.x - 1, pos.y))
+        }
+
+        fn has_right_fence(pos: &Coord, all_coords: &FxHashSet<Coord>) -> bool {
+            !all_coords.contains(&Coord::new(pos.x + 1, pos.y))
+        }
+
+        fn has_top_fence(pos: &Coord, all_coords: &FxHashSet<Coord>) -> bool {
+            pos.y == 0 || !all_coords.contains(&Coord::new(pos.x, pos.y - 1))
+        }
+
+        fn has_bottom_fence(pos: &Coord, all_coords: &FxHashSet<Coord>) -> bool {
+            !all_coords.contains(&Coord::new(pos.x, pos.y + 1))
+        }
+
+        fn count_sides<'a>(points: impl Iterator<Item = &'a usize>) -> usize {
+            points.tuple_windows().fold(
+                1,
+                |counter, (a, b)| if a + 1 == *b { counter } else { counter + 1 },
+            )
+        }
+
+        let mut total_sides = 0;
+
+        // left | right fences
+        for (x, ys) in border_plots_by_x.iter() {
+            let left_sides = ys
+                .iter()
+                .filter(|y| has_left_fence(&Coord::new(*x, **y), &all_coords))
+                .collect_vec();
+
+            let right_sides = ys
+                .iter()
+                .filter(|y| has_right_fence(&Coord::new(*x, **y), &all_coords))
+                .collect_vec();
+
+            let left_count = if left_sides.is_empty() {
+                0
+            } else {
+                count_sides(left_sides.into_iter())
+            };
+
+            let right_count = if right_sides.is_empty() {
+                0
+            } else {
+                count_sides(right_sides.into_iter())
+            };
+
+            total_sides += left_count + right_count;
+        }
+
+        // top | bottom fences
+        for (y, xs) in border_plots_by_y.iter() {
+            let top_sides = xs
+                .iter()
+                .filter(|x| has_top_fence(&Coord::new(**x, *y), &all_coords))
+                .collect_vec();
+
+            let bottom_sides = xs
+                .iter()
+                .filter(|x| has_bottom_fence(&Coord::new(**x, *y), &all_coords))
+                .collect_vec();
+
+            let top_count = if top_sides.is_empty() {
+                0
+            } else {
+                count_sides(top_sides.into_iter())
+            };
+
+            let bottom_count = if bottom_sides.is_empty() {
+                0
+            } else {
+                count_sides(bottom_sides.into_iter())
+            };
+
+            total_sides += top_count + bottom_count;
+        }
+
+        total_sides
+    }
 }
 
 pub(crate) struct FencedGarden {
@@ -107,6 +229,10 @@ impl FencedGarden {
 
     pub(crate) fn total_cost(&self) -> usize {
         self.regions.iter().map(|p| p.area() * p.perimeter()).sum()
+    }
+
+    pub(crate) fn discount_cost(&self) -> usize {
+        self.regions.iter().map(|r| r.area() * r.sides()).sum()
     }
 }
 
@@ -122,17 +248,12 @@ impl From<Garden> for FencedGarden {
                 .cloned()
                 .expect("we just queried map for this key, it must exist");
 
-            info!("Region {region_plant_type:?}; starting: {starting_coord:?}");
-
             let mut region_plots: Vec<Plot> = Vec::new();
             let mut next_steps = vec![starting_coord];
             let mut already_visited_in_same_region: FxHashSet<Coord> = FxHashSet::default();
 
             while let Some(current_coord) = next_steps.pop() {
-                info!("Processing plot @ {current_coord:?}");
-
                 if !already_visited_in_same_region.insert(current_coord.clone()) {
-                    warn!("Plot @ {current_coord:?} already processed");
                     continue;
                 }
 
@@ -143,7 +264,6 @@ impl From<Garden> for FencedGarden {
                 for neighbour in neighbours {
                     let Some(neighbour) = neighbour else {
                         border_count += 1;
-                        info!("neighbour {neighbour:?} not in map");
                         continue;
                     };
 
@@ -151,16 +271,13 @@ impl From<Garden> for FencedGarden {
 
                     if let Some(plant_type) = garden.plots.get(&neighbour) {
                         if *plant_type == region_plant_type {
-                            info!("neighbour {neighbour:?} our plant type!");
                             if !already_visited_in_same_region.contains(&neighbour) {
                                 next_steps.push(neighbour);
                             }
                         } else {
-                            info!("neighbour {neighbour:?} different plant type!");
                             border_count += 1;
                         }
                     } else {
-                        info!("neighbour {neighbour:?} already processed!");
                         border_count += 1;
                     }
                 }
